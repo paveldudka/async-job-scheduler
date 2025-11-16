@@ -29,7 +29,7 @@ export async function GET(
         createdAt: job.data.createdAt,
         progress: job.progress || 0,
         finishedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
-        failedReason: job.failedReason || null,
+        failedReason: state === 'failed' ? (job.failedReason || null) : null,
         attemptsMade: job.attemptsMade,
         logs,
       },
@@ -45,7 +45,7 @@ export async function GET(
 
 // DELETE /api/jobs/[id] - Delete job
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

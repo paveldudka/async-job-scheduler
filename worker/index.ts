@@ -106,6 +106,17 @@ const worker = new Worker<JobData>(
       return result;
     } catch (error) {
       console.error(`❌ Job ${job.id} failed:`, error);
+
+      // Publish failure event to Redis for SSE
+      await redis.publish(
+        `job:${job.id}:progress`,
+        JSON.stringify({
+          type: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+        })
+      );
+
       throw error;
     }
   },

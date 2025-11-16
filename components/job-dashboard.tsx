@@ -86,6 +86,16 @@ export function JobDashboard() {
               ? { ...job, progress: { progress: data.progress, action: data.action, timestamp: data.timestamp } }
               : job
           ))
+        } else if (data.type === 'failed') {
+          // Job failed - update immediately
+          setJobs(prev => prev.map(job =>
+            job.id === jobId
+              ? { ...job, status: 'failed', failedReason: data.error }
+              : job
+          ))
+          fetchJobs()
+          es.close()
+          eventSourcesRef.current.delete(jobId)
         } else if (data.type === 'status') {
           // Job completed or failed - refresh
           fetchJobs()

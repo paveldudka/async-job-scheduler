@@ -33,10 +33,19 @@ export async function GET(
       subscriber.on('message', (channel: string, message: string) => {
         if (channel === channelName) {
           try {
-            const progress = JSON.parse(message);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'progress', ...progress })}\n\n`)
-            );
+            const data = JSON.parse(message);
+
+            // Handle different event types
+            if (data.type === 'failed') {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'failed', error: data.error, timestamp: data.timestamp })}\n\n`)
+              );
+            } else {
+              // Regular progress update
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'progress', ...data })}\n\n`)
+              );
+            }
           } catch (error) {
             console.error('Error parsing progress message:', error);
           }
@@ -76,15 +85,27 @@ export async function GET(
 
           // If job is completed or failed, send final status and close
           if (state === 'completed' || state === 'failed') {
+            const statusData: {
+              type: string;
+              status: string;
+              progress?: number;
+              error?: string | null;
+              timestamp: string;
+            } = {
+              type: 'status',
+              status: state,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Only set progress to 100 for completed jobs
+            if (state === 'completed') {
+              statusData.progress = 100;
+            } else if (state === 'failed') {
+              statusData.error = currentJob.failedReason || 'Unknown error';
+            }
+
             controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: 'status',
-                  status: state,
-                  progress: 100,
-                  timestamp: new Date().toISOString(),
-                })}\n\n`
-              )
+              encoder.encode(`data: ${JSON.stringify(statusData)}\n\n`)
             );
 
             clearInterval(statusCheckInterval);

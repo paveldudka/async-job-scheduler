@@ -52,16 +52,19 @@ export async function GET() {
     const { all } = await getAllJobs();
 
     const jobs = await Promise.all(
-      all.map(async (job) => ({
-        id: job.id,
-        name: job.data.name,
-        status: await job.getState(),
-        createdAt: job.data.createdAt,
-        progress: job.progress || 0,
-        finishedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
-        failedReason: job.failedReason || null,
-        attemptsMade: job.attemptsMade,
-      }))
+      all.map(async (job) => {
+        const state = await job.getState();
+        return {
+          id: job.id,
+          name: job.data.name,
+          status: state,
+          createdAt: job.data.createdAt,
+          progress: job.progress || 0,
+          finishedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
+          failedReason: state === 'failed' ? (job.failedReason || null) : null,
+          attemptsMade: job.attemptsMade,
+        };
+      })
     );
 
     // Sort by creation time (newest first)
