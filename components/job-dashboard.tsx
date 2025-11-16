@@ -65,12 +65,14 @@ export function JobDashboard() {
     // Open SSE for active jobs
     activeJobs.forEach((job) => {
       if (!eventSourcesRef.current.has(job.id)) {
+        console.log(`============== Opening SSE for job ${job.id}`);
         connectToJobStream(job.id);
       }
     });
 
     return () => {
       // Cleanup all SSE connections on unmount
+      console.log("============== Closing SSE connections");
       eventSourcesRef.current.forEach((es) => es.close());
       eventSourcesRef.current.clear();
     };

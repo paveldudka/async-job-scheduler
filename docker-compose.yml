@@ -12,8 +12,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-    networks:
-      - async-app-network-dev
 
   web:
     build:
@@ -21,8 +19,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: async-app-web-dev
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     environment:
       - REDIS_URL=redis://redis:6379
       - QUEUE_NAME=jobs
@@ -34,8 +31,6 @@ services:
       - .:/app
       - /app/node_modules
       - /app/.next
-    networks:
-      - async-app-network-dev
 
   worker:
     build:
@@ -43,20 +38,13 @@ services:
       dockerfile: Dockerfile.dev
     container_name: async-app-worker-dev
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     environment:
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     volumes:
       - ./worker:/app
       - /app/node_modules
-    networks:
-      - async-app-network-dev
 
 volumes:
   redis-data-dev:
-
-networks:
-  async-app-network-dev:
-    driver: bridge

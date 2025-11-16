@@ -1,16 +1,16 @@
-import { Worker, Job } from 'bullmq';
-import Redis from 'ioredis';
+import { Worker, Job } from "bullmq";
+import Redis from "ioredis";
 
 // Redis connection
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
 const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
 // Queue name
-const QUEUE_NAME = process.env.QUEUE_NAME || 'jobs';
-const MAX_CONCURRENCY = parseInt(process.env.MAX_CONCURRENCY || '5');
+const QUEUE_NAME = process.env.QUEUE_NAME || "jobs";
+const MAX_CONCURRENCY = parseInt(process.env.MAX_CONCURRENCY || "5");
 
 // Job data interface
 interface JobData {
@@ -28,21 +28,23 @@ interface JobProgress {
 
 // Mock web agent actions
 const WEB_AGENT_ACTIONS = [
-  'Navigating to page',
-  'Loading resources',
-  'Clicking button',
-  'Typing text in input field',
-  'Scrolling to element',
-  'Waiting for element to appear',
-  'Taking screenshot',
-  'Extracting data from page',
-  'Validating form fields',
-  'Submitting form',
+  "Navigating to page",
+  "Loading resources",
+  "Clicking button",
+  "Typing text in input field",
+  "Scrolling to element",
+  "Waiting for element to appear",
+  "Taking screenshot",
+  "Extracting data from page",
+  "Validating form fields",
+  "Submitting form",
 ];
 
 // Get random action
 function getRandomAction(): string {
-  return WEB_AGENT_ACTIONS[Math.floor(Math.random() * WEB_AGENT_ACTIONS.length)];
+  return WEB_AGENT_ACTIONS[
+    Math.floor(Math.random() * WEB_AGENT_ACTIONS.length)
+  ];
 }
 
 // Simulate async work with progress updates
@@ -99,7 +101,7 @@ const worker = new Worker<JobData>(
     try {
       // Simulate random failures (15% chance)
       if (Math.random() < 0.15) {
-        throw new Error('Simulated random failure');
+        throw new Error("Simulated random failure");
       }
 
       const result = await processJob(job);
@@ -111,8 +113,8 @@ const worker = new Worker<JobData>(
       await redis.publish(
         `job:${job.id}:progress`,
         JSON.stringify({
-          type: 'failed',
-          error: error instanceof Error ? error.message : 'Unknown error',
+          type: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
           timestamp: new Date().toISOString(),
         })
       );
@@ -131,33 +133,35 @@ const worker = new Worker<JobData>(
 );
 
 // Worker event listeners
-worker.on('completed', (job) => {
-  console.log(`✅ Job ${job.id} completed successfully`);
+worker.on("completed", (job) => {
+  console.log(`[WORKER] ✅ Job ${job.id} completed successfully`);
 });
 
-worker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} failed with error:`, err.message);
+worker.on("failed", (job, err) => {
+  console.error(`[WORKER] ❌ Job ${job?.id} failed with error:`, err.message);
 });
 
-worker.on('progress', (job, progress) => {
+worker.on("progress", (job, progress) => {
   const prog = progress as JobProgress;
-  console.log(`📊 Job ${job.id} progress: ${prog.progress}% - ${prog.action}`);
+  console.log(
+    `[WORKER] 📊 Job ${job.id} progress: ${prog.progress}% - ${prog.action}`
+  );
 });
 
-worker.on('error', (err) => {
-  console.error('Worker error:', err);
+worker.on("error", (err) => {
+  console.error("Worker error:", err);
 });
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down worker gracefully...');
+process.on("SIGINT", async () => {
+  console.log("\n🛑 Shutting down worker gracefully...");
   await worker.close();
   await redis.quit();
   process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down worker gracefully...');
+process.on("SIGTERM", async () => {
+  console.log("\n🛑 Shutting down worker gracefully...");
   await worker.close();
   await redis.quit();
   process.exit(0);

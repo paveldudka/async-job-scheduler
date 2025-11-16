@@ -19,6 +19,23 @@ export async function GET(
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let isClosed = false;
+      const cleanupSSEConnection = async () => {
+        if (isClosed) {
+          return;
+        }
+        console.log("Client disconnected. Closing SSE connection");
+        isClosed = true;
+        clearInterval(heartbeatInterval);
+        clearInterval(statusCheckInterval);
+        await subscriber.unsubscribe(channelName);
+        await subscriber.quit();
+        if (controller.desiredSize) {
+          // Desired size is non-zero, meaning the client is still connected
+          controller.close();
+        }
+      };
+
       // Send initial connection message
       controller.enqueue(
         encoder.encode(
@@ -69,7 +86,7 @@ export async function GET(
         try {
           controller.enqueue(encoder.encode(`: heartbeat ${Date.now()}\n\n`));
         } catch (error) {
-          clearInterval(heartbeatInterval);
+          console.error("Error sending heartbeat:", error);
         }
       }, 15000);
 
@@ -78,10 +95,6 @@ export async function GET(
         try {
           const currentJob = await getJob(id);
           if (!currentJob) {
-            clearInterval(statusCheckInterval);
-            clearInterval(heartbeatInterval);
-            await subscriber.unsubscribe(channelName);
-            await subscriber.quit();
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -90,7 +103,7 @@ export async function GET(
                 })}\n\n`
               )
             );
-            controller.close();
+            await cleanupSSEConnection();
             return;
           }
 
@@ -121,11 +134,7 @@ export async function GET(
               encoder.encode(`data: ${JSON.stringify(statusData)}\n\n`)
             );
 
-            clearInterval(statusCheckInterval);
-            clearInterval(heartbeatInterval);
-            await subscriber.unsubscribe(channelName);
-            await subscriber.quit();
-            controller.close();
+            await cleanupSSEConnection();
           }
         } catch (error) {
           console.error("Error checking job status:", error);
@@ -133,14 +142,7 @@ export async function GET(
       }, 1000);
 
       // Handle client disconnect
-      request.signal.addEventListener("abort", async () => {
-        console.log("===== PASHA ===== client disconnected");
-        clearInterval(statusCheckInterval);
-        clearInterval(heartbeatInterval);
-        await subscriber.unsubscribe(channelName);
-        await subscriber.quit();
-        controller.close();
-      });
+      request.signal.addEventListener("abort", cleanupSSEConnection);
     },
   });
 

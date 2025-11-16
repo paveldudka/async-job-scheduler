@@ -1,8 +1,8 @@
-import { Queue, QueueEvents } from 'bullmq';
-import { redis } from './redis';
+import { Queue, QueueEvents } from "bullmq";
+import { redis } from "./redis";
 
 // Queue configuration
-const QUEUE_NAME = process.env.QUEUE_NAME || 'jobs';
+const QUEUE_NAME = process.env.QUEUE_NAME || "jobs";
 
 // Job data interface
 export interface JobData {
@@ -24,7 +24,7 @@ export const jobQueue = new Queue<JobData>(QUEUE_NAME, {
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type: 'exponential',
+      type: "exponential",
       delay: 2000,
     },
     removeOnComplete: false, // Keep completed jobs (manual deletion only)
@@ -32,27 +32,9 @@ export const jobQueue = new Queue<JobData>(QUEUE_NAME, {
   },
 });
 
-// Queue events for monitoring
-export const queueEvents = new QueueEvents(QUEUE_NAME, {
-  connection: redis,
-});
-
-// Queue event listeners
-queueEvents.on('completed', ({ jobId }) => {
-  console.log(`✅ Job ${jobId} completed`);
-});
-
-queueEvents.on('failed', ({ jobId, failedReason }) => {
-  console.error(`❌ Job ${jobId} failed: ${failedReason}`);
-});
-
-queueEvents.on('progress', ({ jobId, data }) => {
-  console.log(`📊 Job ${jobId} progress:`, data);
-});
-
 // Helper functions
 export async function addJob(data: JobData) {
-  const job = await jobQueue.add('process-job', data, {
+  const job = await jobQueue.add("process-job", data, {
     jobId: data.id,
   });
   return job;
@@ -107,13 +89,18 @@ export async function deleteJob(jobId: string) {
 }
 
 export async function getQueueMetrics() {
-  const counts = await jobQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
+  const counts = await jobQueue.getJobCounts(
+    "waiting",
+    "active",
+    "completed",
+    "failed",
+    "delayed"
+  );
   return counts;
 }
 
 // Graceful shutdown
 export async function closeQueue() {
-  await queueEvents.close();
   await jobQueue.close();
 }
 
