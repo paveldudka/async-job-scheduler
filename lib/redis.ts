@@ -1,9 +1,7 @@
 import Redis from 'ioredis';
 
 const getRedisUrl = () => {
-  const host = process.env.REDIS_HOST || 'localhost';
-  const port = process.env.REDIS_PORT || '6379';
-  return `redis://${host}:${port}`;
+  return process.env.REDIS_URL || 'redis://localhost:6379';
 };
 
 // Singleton Redis client
