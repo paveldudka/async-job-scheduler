@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Play, X, RotateCw, Trash2, Activity, CheckCircle2, XCircle, Loader2, Clock, Plus } from 'lucide-react'
+import { Play, X, RotateCw, Trash2, Activity, CheckCircle2, XCircle, Loader2, Clock, Plus, Settings } from 'lucide-react'
+import Link from 'next/link'
 
 type JobStatus = "waiting" | "active" | "completed" | "failed" | "delayed"
 
@@ -224,13 +225,21 @@ export function JobDashboard() {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight mb-2 text-balance">
-          Job Execution Dashboard
-        </h1>
-        <p className="text-muted-foreground text-balance">
-          Submit and monitor job execution status in real-time
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-2 text-balance">
+            Job Execution Dashboard
+          </h1>
+          <p className="text-muted-foreground text-balance">
+            Submit and monitor job execution status in real-time
+          </p>
+        </div>
+        <Link href="/admin">
+          <Button variant="outline" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Admin
+          </Button>
+        </Link>
       </div>
 
       {/* Stats */}
