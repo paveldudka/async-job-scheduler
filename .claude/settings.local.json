@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(docker compose:*)",
+      "Bash(lsof:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx:*)",
+      "Bash(docker:*)",
+      "Bash(git:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
