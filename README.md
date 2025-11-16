@@ -15,20 +15,31 @@ User → Next.js API → Redis Queue → Worker (Docker) → SSE Updates → Rea
 
 ## Quick Start
 
-### Terminal 1: Redis + Worker
+### Local Development
+
+Run entire stack with hot reload:
+
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-### Terminal 2: Next.js Server
+Access at `http://localhost:3000`
+
+**Stop:**
 ```bash
-npm install
-npm run dev
+docker compose down
 ```
 
-### Browser
+**Clean restart (wipes Redis data):**
+```bash
+docker compose down -v
+docker compose up --build
 ```
-http://localhost:3000
+
+### Production
+
+```bash
+docker compose -f docker-compose.prod.yml up --build
 ```
 
 ## Features

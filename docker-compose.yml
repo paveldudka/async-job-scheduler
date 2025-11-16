@@ -1,11 +1,11 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: async-app-redis
+    container_name: async-app-redis-dev
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
+      - redis-data-dev:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -13,13 +13,13 @@ services:
       timeout: 3s
       retries: 3
     networks:
-      - async-app-network
+      - async-app-network-dev
 
   web:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: async-app-web
+      dockerfile: Dockerfile.dev
+    container_name: async-app-web-dev
     depends_on:
       redis:
         condition: service_healthy
@@ -27,30 +27,36 @@ services:
       - REDIS_URL=redis://redis:6379
       - QUEUE_NAME=jobs
       - MAX_CONCURRENCY=5
-      - NODE_ENV=production
+      - NODE_ENV=development
     ports:
       - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
     networks:
-      - async-app-network
+      - async-app-network-dev
 
   worker:
     build:
       context: ./worker
-      dockerfile: Dockerfile
-    container_name: async-app-worker
+      dockerfile: Dockerfile.dev
+    container_name: async-app-worker-dev
     depends_on:
       redis:
         condition: service_healthy
     environment:
       - REDIS_URL=redis://redis:6379
-      - NODE_ENV=production
-    restart: unless-stopped
+      - NODE_ENV=development
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
     networks:
-      - async-app-network
+      - async-app-network-dev
 
 volumes:
-  redis-data:
+  redis-data-dev:
 
 networks:
-  async-app-network:
+  async-app-network-dev:
     driver: bridge
