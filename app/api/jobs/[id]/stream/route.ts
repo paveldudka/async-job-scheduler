@@ -30,16 +30,20 @@ export async function GET(
 
       const channelName = `job:${id}:progress`;
 
-      await subscriber.subscribe(channelName, (message) => {
-        try {
-          const progress = JSON.parse(message);
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'progress', ...progress })}\n\n`)
-          );
-        } catch (error) {
-          console.error('Error parsing progress message:', error);
+      subscriber.on('message', (channel: string, message: string) => {
+        if (channel === channelName) {
+          try {
+            const progress = JSON.parse(message);
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: 'progress', ...progress })}\n\n`)
+            );
+          } catch (error) {
+            console.error('Error parsing progress message:', error);
+          }
         }
       });
+
+      await subscriber.subscribe(channelName);
 
       // Send heartbeat every 15 seconds to keep connection alive
       const heartbeatInterval = setInterval(() => {

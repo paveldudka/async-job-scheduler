@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+README.md
+*.md
+.env*.local
+.vscode
+.idea
+worker
+test
+test-sse.html
+test-worker.sh
+E2E-TEST-INSTRUCTIONS.md
+.claude

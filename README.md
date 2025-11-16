@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NextJS Queue-Based Architecture Demo
 
-## Getting Started
+Production-ready demonstration of asynchronous job processing using NextJS, Redis, BullMQ, and Server-Sent Events.
 
-First, run the development server:
+## Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+User → Next.js API → Redis Queue → Worker (Docker) → SSE Updates → Real-time UI
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Next.js 16**: API routes + React 19 UI
+- **Redis + BullMQ**: Job queue & pub/sub
+- **Worker (Docker)**: Background job processor (max 5 concurrent)
+- **SSE**: Real-time progress streaming
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quick Start
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Terminal 1: Redis + Worker
+```bash
+docker compose up
+```
 
-## Learn More
+### Terminal 2: Next.js Server
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Browser
+```
+http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Features
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+✅ Create, monitor, cancel, retry, delete jobs
+✅ Real-time SSE progress updates
+✅ Concurrent processing (5 jobs max)
+✅ Mock web agent actions (10s duration)
+✅ Full TypeScript + tests (28 passing)
 
-## Deploy on Vercel
+## API Endpoints
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `POST /api/jobs` - Create job
+- `GET /api/jobs` - List all jobs
+- `GET /api/jobs/[id]` - Job details
+- `DELETE /api/jobs/[id]` - Delete job
+- `POST /api/jobs/[id]/cancel` - Cancel job
+- `POST /api/jobs/[id]/retry` - Retry failed job
+- `GET /api/jobs/[id]/stream` - SSE endpoint
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project Structure
+
+```
+app/api/jobs/          # REST API routes
+components/            # React components
+lib/                   # Redis & queue utilities
+worker/                # BullMQ worker (Docker)
+test/                  # Unit tests (Vitest)
+```
+
+## Environment
+
+`.env.local`:
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+QUEUE_NAME=jobs
+MAX_CONCURRENCY=5
+```
+
+## Testing
+
+```bash
+npm test              # Run tests
+npm run test:watch    # Watch mode
+```
+
+28 tests covering API routes and queue operations.
+
+## How It Works
+
+1. **Job Created** → Added to Redis queue via BullMQ
+2. **Worker Picks Up** → Processes for 10s with 1s updates
+3. **Progress Published** → Worker → Redis pub/sub
+4. **SSE Streams** → Server subscribes to Redis → Browser
+5. **UI Updates** → React state updates via EventSource
+
+## Tech Stack
+
+Next.js 16 • React 19 • TypeScript • Tailwind CSS 4 • shadcn/ui • Redis • BullMQ • Docker
+
+## License
+
+MIT

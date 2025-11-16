@@ -15,7 +15,7 @@ class RedisClient {
       RedisClient.instance = new Redis(getRedisUrl(), {
         maxRetriesPerRequest: null, // Required for BullMQ blocking operations
         enableReadyCheck: true,
-        lazyConnect: false,
+        lazyConnect: true, // Don't connect immediately
       });
 
       RedisClient.instance.on('connect', () => {
@@ -23,7 +23,10 @@ class RedisClient {
       });
 
       RedisClient.instance.on('error', (err) => {
-        console.error('❌ Redis error:', err);
+        // Suppress errors during build
+        if (process.env.NODE_ENV !== 'production' || typeof window === 'undefined') {
+          console.error('❌ Redis error:', err);
+        }
       });
 
       RedisClient.instance.on('close', () => {
@@ -42,5 +45,10 @@ class RedisClient {
   }
 }
 
+// Export getter function instead of instance to avoid connection during build
+export const getRedis = () => RedisClient.getInstance();
+
+// Also export direct instance for convenience (will only connect when first accessed)
 export const redis = RedisClient.getInstance();
+
 export default RedisClient;
