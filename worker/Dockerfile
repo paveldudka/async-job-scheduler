@@ -4,12 +4,16 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install ALL dependencies (including tsx for runtime)
+RUN npm install
 
 # Copy worker code
-COPY . .
+COPY index.ts ./
 
-# Run worker
-CMD ["npm", "start"]
+# Compile TypeScript to JavaScript
+RUN npx tsc
+
+# Run compiled JavaScript
+CMD ["node", "dist/index.js"]
