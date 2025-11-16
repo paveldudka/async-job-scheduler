@@ -56,3 +56,17 @@ Core component simulating async job execution:
 - Target: ES2017
 - Path alias `@/*` maps to root
 - JSX preserve mode for Next.js
+
+## Execution Plan
+
+**Active Plan**: `.claude/plans/queue-architecture.md`
+
+### Phase Gate Rule
+
+⚠️ **MANDATORY**: Before proceeding to next phase, STOP and ask user for approval.
+
+### Plan Updates
+
+- Keep phase statuses current in plan file
+- Log architecture decisions in plan when they change
+- Update plan file whenever requirements or approach changes
