@@ -18,24 +18,29 @@ npm run lint    # Run ESLint
 ## Architecture
 
 ### App Router Structure
+
 - Next.js App Router with server/client components
 - Root: `app/layout.tsx` (Geist fonts, global styles)
 - Home: `app/page.tsx` (renders JobDashboard)
 - Global styles: `app/globals.css`
 
 ### Component Organization
+
 - `components/ui/*` - shadcn/ui primitives (Button, Card, Badge, Progress, Input)
 - `components/job-dashboard.tsx` - Main feature component
 - `lib/utils.ts` - Utility functions (cn for classNames)
 
 ### Path Aliases
+
 All imports use `@/*` alias pointing to project root:
+
 ```typescript
-import { JobDashboard } from "@/components/job-dashboard"
-import { cn } from "@/lib/utils"
+import { JobDashboard } from "@/components/job-dashboard";
+import { cn } from "@/lib/utils";
 ```
 
 ### Styling
+
 - Tailwind CSS 4 with PostCSS
 - CSS variables for theming (defined in globals.css)
 - shadcn/ui configuration in `components.json`:
@@ -45,13 +50,16 @@ import { cn } from "@/lib/utils"
   - Icon library: lucide-react
 
 ### Job Dashboard Logic
+
 Core component simulating async job execution:
+
 - Job states: pending → running → completed/failed/cancelled
 - Auto-progression: useEffect interval updates running jobs every 500ms
 - Features: create, cancel, retry, delete jobs; filter by status
 - Progress simulation: random increments until 100%, then 85% success rate
 
 ## TypeScript Config
+
 - Strict mode enabled
 - Target: ES2017
 - Path alias `@/*` maps to root
@@ -64,6 +72,10 @@ Core component simulating async job execution:
 ### Phase Gate Rule
 
 ⚠️ **MANDATORY**: Before proceeding to next phase, STOP and ask user for approval.
+
+## Testing changes
+
+You have access to real browser using chrome dev tools mcp. Use it to test changes. Pay attention to console logs to make sure there are no errors
 
 ### Plan Updates
 

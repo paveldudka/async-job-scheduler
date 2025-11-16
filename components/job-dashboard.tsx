@@ -1,226 +1,252 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Play, X, RotateCw, Trash2, Activity, CheckCircle2, XCircle, Loader2, Clock, Plus, Settings } from 'lucide-react'
-import Link from 'next/link'
+import { useState, useEffect, useRef } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Play,
+  X,
+  RotateCw,
+  Trash2,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Clock,
+  Plus,
+  Settings,
+} from "lucide-react";
+import Link from "next/link";
 
-type JobStatus = "waiting" | "active" | "completed" | "failed" | "delayed"
+type JobStatus = "waiting" | "active" | "completed" | "failed" | "delayed";
 
 interface Job {
-  id: string
-  name: string
-  status: JobStatus
-  progress: number | { progress: number; action: string; timestamp: string }
-  createdAt: string
-  finishedAt: string | null
-  failedReason: string | null
-  attemptsMade: number
-  logs?: string[]
+  id: string;
+  name: string;
+  status: JobStatus;
+  progress: number | { progress: number; action: string; timestamp: string };
+  createdAt: string;
+  finishedAt: string | null;
+  failedReason: string | null;
+  attemptsMade: number;
+  logs?: string[];
 }
 
 export function JobDashboard() {
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all")
-  const [loading, setLoading] = useState(false)
-  const eventSourcesRef = useRef<Map<string, EventSource>>(new Map())
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all");
+  const [loading, setLoading] = useState(false);
+  const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
 
   // Fetch all jobs on mount
   useEffect(() => {
-    fetchJobs()
-    const interval = setInterval(fetchJobs, 5000) // Refresh every 5s
-    return () => clearInterval(interval)
-  }, [])
+    fetchJobs();
+    const interval = setInterval(fetchJobs, 5000); // Refresh every 5s
+    return () => clearInterval(interval);
+  }, []);
 
   // Setup SSE for active jobs
   useEffect(() => {
-    const activeJobs = jobs.filter(j => j.status === 'active' || j.status === 'waiting')
+    const activeJobs = jobs.filter(
+      (j) => j.status === "active" || j.status === "waiting"
+    );
 
     // Close SSE for non-active jobs
     eventSourcesRef.current.forEach((es, jobId) => {
-      if (!activeJobs.find(j => j.id === jobId)) {
-        es.close()
-        eventSourcesRef.current.delete(jobId)
+      if (!activeJobs.find((j) => j.id === jobId)) {
+        es.close();
+        eventSourcesRef.current.delete(jobId);
       }
-    })
+    });
 
     // Open SSE for active jobs
-    activeJobs.forEach(job => {
+    activeJobs.forEach((job) => {
       if (!eventSourcesRef.current.has(job.id)) {
-        connectToJobStream(job.id)
+        connectToJobStream(job.id);
       }
-    })
+    });
 
     return () => {
       // Cleanup all SSE connections on unmount
-      eventSourcesRef.current.forEach(es => es.close())
-      eventSourcesRef.current.clear()
-    }
-  }, [jobs])
+      eventSourcesRef.current.forEach((es) => es.close());
+      eventSourcesRef.current.clear();
+    };
+  }, [jobs]);
 
   const fetchJobs = async () => {
     try {
-      const res = await fetch('/api/jobs')
-      const data = await res.json()
+      const res = await fetch("/api/jobs");
+      const data = await res.json();
       if (data.success) {
-        setJobs(data.jobs)
+        setJobs(data.jobs);
       }
     } catch (error) {
-      console.error('Error fetching jobs:', error)
+      console.error("Error fetching jobs:", error);
     }
-  }
+  };
 
   const connectToJobStream = (jobId: string) => {
-    const es = new EventSource(`/api/jobs/${jobId}/stream`)
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
 
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data)
+        const data = JSON.parse(event.data);
 
-        if (data.type === 'progress') {
-          setJobs(prev => prev.map(job =>
-            job.id === jobId
-              ? { ...job, progress: { progress: data.progress, action: data.action, timestamp: data.timestamp } }
-              : job
-          ))
-        } else if (data.type === 'failed') {
+        if (data.type === "progress") {
+          setJobs((prev) =>
+            prev.map((job) =>
+              job.id === jobId
+                ? {
+                    ...job,
+                    progress: {
+                      progress: data.progress,
+                      action: data.action,
+                      timestamp: data.timestamp,
+                    },
+                  }
+                : job
+            )
+          );
+        } else if (data.type === "failed") {
           // Job failed - update immediately
-          setJobs(prev => prev.map(job =>
-            job.id === jobId
-              ? { ...job, status: 'failed', failedReason: data.error }
-              : job
-          ))
-          fetchJobs()
-          es.close()
-          eventSourcesRef.current.delete(jobId)
-        } else if (data.type === 'status') {
+          setJobs((prev) =>
+            prev.map((job) =>
+              job.id === jobId
+                ? { ...job, status: "failed", failedReason: data.error }
+                : job
+            )
+          );
+          fetchJobs();
+          es.close();
+          eventSourcesRef.current.delete(jobId);
+        } else if (data.type === "status") {
           // Job completed or failed - refresh
-          fetchJobs()
-          es.close()
-          eventSourcesRef.current.delete(jobId)
+          fetchJobs();
+          es.close();
+          eventSourcesRef.current.delete(jobId);
         }
       } catch (error) {
-        console.error('Error parsing SSE message:', error)
+        console.error("Error parsing SSE message:", error);
       }
-    }
+    };
 
     es.onerror = () => {
-      es.close()
-      eventSourcesRef.current.delete(jobId)
-    }
+      es.close();
+      eventSourcesRef.current.delete(jobId);
+    };
 
-    eventSourcesRef.current.set(jobId, es)
-  }
+    eventSourcesRef.current.set(jobId, es);
+  };
 
   const createJob = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `Job ${jobs.length + 1}` })
-      })
-      const data = await res.json()
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: `Job ${jobs.length + 1}` }),
+      });
+      const data = await res.json();
       if (data.success) {
-        await fetchJobs()
+        await fetchJobs();
       }
     } catch (error) {
-      console.error('Error creating job:', error)
+      console.error("Error creating job:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const cancelJob = async (id: string) => {
     try {
-      await fetch(`/api/jobs/${id}/cancel`, { method: 'POST' })
-      await fetchJobs()
+      await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
+      await fetchJobs();
     } catch (error) {
-      console.error('Error cancelling job:', error)
+      console.error("Error cancelling job:", error);
     }
-  }
+  };
 
   const retryJob = async (id: string) => {
     try {
-      await fetch(`/api/jobs/${id}/retry`, { method: 'POST' })
-      await fetchJobs()
+      await fetch(`/api/jobs/${id}/retry`, { method: "POST" });
+      await fetchJobs();
     } catch (error) {
-      console.error('Error retrying job:', error)
+      console.error("Error retrying job:", error);
     }
-  }
+  };
 
   const deleteJob = async (id: string) => {
     try {
-      await fetch(`/api/jobs/${id}`, { method: 'DELETE' })
-      await fetchJobs()
+      await fetch(`/api/jobs/${id}`, { method: "DELETE" });
+      await fetchJobs();
     } catch (error) {
-      console.error('Error deleting job:', error)
+      console.error("Error deleting job:", error);
     }
-  }
+  };
 
   const getStatusIcon = (status: JobStatus) => {
     switch (status) {
       case "waiting":
       case "delayed":
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-4 w-4" />;
       case "active":
-        return <Loader2 className="h-4 w-4 animate-spin" />
+        return <Loader2 className="h-4 w-4 animate-spin" />;
       case "completed":
-        return <CheckCircle2 className="h-4 w-4" />
+        return <CheckCircle2 className="h-4 w-4" />;
       case "failed":
-        return <XCircle className="h-4 w-4" />
+        return <XCircle className="h-4 w-4" />;
     }
-  }
+  };
 
   const getStatusColor = (status: JobStatus) => {
     switch (status) {
       case "waiting":
       case "delayed":
-        return "bg-muted text-muted-foreground"
+        return "bg-muted text-muted-foreground";
       case "active":
-        return "bg-primary text-primary-foreground"
+        return "bg-primary text-primary-foreground";
       case "completed":
-        return "bg-accent text-accent-foreground"
+        return "bg-accent text-accent-foreground";
       case "failed":
-        return "bg-destructive text-destructive-foreground"
+        return "bg-destructive text-destructive-foreground";
     }
-  }
+  };
 
   const formatDuration = (startTime: string, endTime: string | null) => {
-    const start = new Date(startTime).getTime()
-    const end = endTime ? new Date(endTime).getTime() : new Date().getTime()
-    const ms = end - start
-    const seconds = Math.floor(ms / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
+    const start = new Date(startTime).getTime();
+    const end = endTime ? new Date(endTime).getTime() : new Date().getTime();
+    const ms = end - start;
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
     return minutes > 0
       ? `${minutes}m ${remainingSeconds}s`
-      : `${remainingSeconds}s`
-  }
+      : `${remainingSeconds}s`;
+  };
 
   const getProgress = (job: Job): number => {
-    if (typeof job.progress === 'number') return job.progress
-    return job.progress?.progress || 0
-  }
+    if (typeof job.progress === "number") return job.progress;
+    return job.progress?.progress || 0;
+  };
 
   const getProgressAction = (job: Job): string | null => {
-    if (typeof job.progress === 'object' && job.progress.action) {
-      return job.progress.action
+    if (typeof job.progress === "object" && job.progress.action) {
+      return job.progress.action;
     }
-    return null
-  }
+    return null;
+  };
 
-  const activeCount = jobs.filter((j) => j.status === "active").length
-  const completedCount = jobs.filter((j) => j.status === "completed").length
-  const failedCount = jobs.filter((j) => j.status === "failed").length
+  const activeCount = jobs.filter((j) => j.status === "active").length;
+  const completedCount = jobs.filter((j) => j.status === "completed").length;
+  const failedCount = jobs.filter((j) => j.status === "failed").length;
 
-  const filteredJobs = statusFilter === "all"
-    ? jobs
-    : jobs.filter((job) => job.status === statusFilter)
+  const filteredJobs =
+    statusFilter === "all"
+      ? jobs
+      : jobs.filter((job) => job.status === statusFilter);
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -260,7 +286,9 @@ export function JobDashboard() {
         </Card>
         <Card
           className={`p-4 border-border cursor-pointer transition-all hover:shadow-md ${
-            statusFilter === "active" ? "bg-primary/10 border-primary" : "bg-card"
+            statusFilter === "active"
+              ? "bg-primary/10 border-primary"
+              : "bg-card"
           }`}
           onClick={() => setStatusFilter("active")}
         >
@@ -276,7 +304,9 @@ export function JobDashboard() {
         </Card>
         <Card
           className={`p-4 border-border cursor-pointer transition-all hover:shadow-md ${
-            statusFilter === "completed" ? "bg-accent/10 border-accent" : "bg-card"
+            statusFilter === "completed"
+              ? "bg-accent/10 border-accent"
+              : "bg-card"
           }`}
           onClick={() => setStatusFilter("completed")}
         >
@@ -292,7 +322,9 @@ export function JobDashboard() {
         </Card>
         <Card
           className={`p-4 border-border cursor-pointer transition-all hover:shadow-md ${
-            statusFilter === "failed" ? "bg-destructive/10 border-destructive" : "bg-card"
+            statusFilter === "failed"
+              ? "bg-destructive/10 border-destructive"
+              : "bg-card"
           }`}
           onClick={() => setStatusFilter("failed")}
         >
@@ -310,10 +342,12 @@ export function JobDashboard() {
 
       {/* Submit Job Form */}
       <Card className="p-6 mb-6 bg-card border-border">
-        <h2 className="text-lg font-semibold mb-4 text-balance">Submit New Job</h2>
+        <h2 className="text-lg font-semibold mb-4 text-balance">
+          Submit New Job
+        </h2>
         <Button onClick={createJob} disabled={loading} className="gap-2">
           <Plus className="h-4 w-4" />
-          {loading ? 'Creating...' : 'Submit Job'}
+          {loading ? "Creating..." : "Submit Job"}
         </Button>
       </Card>
 
@@ -325,14 +359,13 @@ export function JobDashboard() {
             <p className="text-muted-foreground text-balance">
               {jobs.length === 0
                 ? "No jobs yet. Submit your first job to get started."
-                : `No ${statusFilter} jobs found.`
-              }
+                : `No ${statusFilter} jobs found.`}
             </p>
           </Card>
         ) : (
           filteredJobs.map((job) => {
-            const progress = getProgress(job)
-            const action = getProgressAction(job)
+            const progress = getProgress(job);
+            const action = getProgressAction(job);
 
             return (
               <Card
@@ -359,7 +392,7 @@ export function JobDashboard() {
                       <h3 className="font-semibold text-lg text-balance truncate">
                         {job.name}
                       </h3>
-                      {action && job.status === 'active' && (
+                      {action && job.status === "active" && (
                         <p className="text-sm text-muted-foreground mt-1">
                           {action}
                         </p>
@@ -368,7 +401,8 @@ export function JobDashboard() {
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {(job.status === "active" || job.status === "waiting") && (
+                      {(job.status === "active" ||
+                        job.status === "waiting") && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -407,10 +441,7 @@ export function JobDashboard() {
                   {/* Progress Bar */}
                   {(job.status === "active" || job.status === "waiting") && (
                     <div className="space-y-1.5">
-                      <Progress
-                        value={progress}
-                        className="h-2 bg-secondary"
-                      />
+                      <Progress value={progress} className="h-2 bg-secondary" />
                       <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
                         <span>{Math.round(progress)}%</span>
                         <span>
@@ -423,10 +454,14 @@ export function JobDashboard() {
                   {/* Job Metadata */}
                   {job.finishedAt && (
                     <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono pt-1">
-                      <span>Duration: {formatDuration(job.createdAt, job.finishedAt)}</span>
+                      <span>
+                        Duration:{" "}
+                        {formatDuration(job.createdAt, job.finishedAt)}
+                      </span>
                       <span>•</span>
                       <span>
-                        Completed: {new Date(job.finishedAt).toLocaleTimeString()}
+                        Completed:{" "}
+                        {new Date(job.finishedAt).toLocaleTimeString()}
                       </span>
                       {job.attemptsMade > 1 && (
                         <>
@@ -445,10 +480,10 @@ export function JobDashboard() {
                   )}
                 </div>
               </Card>
-            )
+            );
           })
         )}
       </div>
     </div>
-  )
+  );
 }
