@@ -13,7 +13,7 @@ class RedisClient {
   static getInstance(): Redis {
     if (!RedisClient.instance) {
       RedisClient.instance = new Redis(getRedisUrl(), {
-        maxRetriesPerRequest: 3,
+        maxRetriesPerRequest: null, // Required for BullMQ blocking operations
         enableReadyCheck: true,
         lazyConnect: false,
       });

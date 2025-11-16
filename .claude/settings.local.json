@@ -7,7 +7,13 @@
       "Bash(npx tsx:*)",
       "Bash(npx:*)",
       "Bash(docker:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run lint)",
+      "Bash(npx next lint:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []
