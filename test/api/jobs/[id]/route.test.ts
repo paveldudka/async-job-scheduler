@@ -10,7 +10,7 @@ const mockJob = {
   finishedOn: null,
   failedReason: null,
   attemptsMade: 0,
-  returnvalue: { logs: ['Log 1', 'Log 2'] },
+  returnvalue: ['Log 1', 'Log 2'],
 };
 
 vi.mock('@/lib/queue', () => ({
