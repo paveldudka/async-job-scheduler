@@ -5,13 +5,23 @@ Production-ready demonstration of asynchronous job processing using NextJS, Redi
 ## Architecture
 
 ```
-User → Next.js API → Redis Queue → Worker (Docker) → SSE Updates → Real-time UI
+Browser → Next.js API → Redis Queue → Worker → Redis Pub/Sub → SSE → Real-time UI
 ```
 
 - **Next.js 16**: API routes + React 19 UI
 - **Redis + BullMQ**: Job queue & pub/sub
-- **Worker (Docker)**: Background job processor (max 5 concurrent)
-- **SSE**: Real-time progress streaming
+- **Worker**: Background job processor (max 5 concurrent)
+- **SSE**: Real-time progress streaming (single connection pattern)
+
+### Data Flow Sequence
+
+![Data Flow Architecture](data_flow.png)
+
+### Component Architecture
+
+![Component Architecture](components.png)
+
+📊 **[View Mermaid source diagrams](.claude/architecture-diagram.md)** (editable sequence & component flows)
 
 ## Quick Start
 
@@ -58,7 +68,7 @@ docker compose -f docker-compose.prod.yml up --build
 - `DELETE /api/jobs/[id]` - Delete job
 - `POST /api/jobs/[id]/cancel` - Cancel job
 - `POST /api/jobs/[id]/retry` - Retry failed job
-- `GET /api/jobs/[id]/stream` - SSE endpoint
+- `GET /api/jobs/stream` - SSE endpoint (single connection for all jobs)
 
 ## Project Structure
 
@@ -93,9 +103,16 @@ npm run test:watch    # Watch mode
 
 1. **Job Created** → Added to Redis queue via BullMQ with `jobData` (id, name, createdAt)
 2. **Worker Picks Up** → Processes for 10s with progress updates via `job.updateProgress()`
-3. **Progress Published** → Worker event listeners → Redis pub/sub (`job:${id}:progress`)
-4. **SSE Streams** → Server subscribes to Redis → Sends full `ApiJob` to browser
-5. **UI Updates** → React state updates with complete job state via EventSource
+3. **Progress Published** → Worker event listeners → Redis pub/sub (`job:*:progress` pattern)
+4. **SSE Streams** → Single frontend connection to `/api/jobs/stream` receives all job updates
+5. **Per-Connection Subscriber** → Each SSE connection creates Redis subscriber, cleaned up on disconnect
+6. **UI Updates** → React filters relevant jobs, updates state via EventSource
+
+**Architecture Benefits:**
+
+- Single SSE connection prevents browser connection limit (6 per domain)
+- Per-connection Redis subscriber: simple, no shared state, automatic cleanup
+- Works across dev HMR, multi-process deployments, and scaling scenarios
 
 ## Tech Stack
 

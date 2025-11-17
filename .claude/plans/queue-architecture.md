@@ -70,10 +70,11 @@
 ---
 
 ## Phase 4: Server-Sent Events (SSE) ✅
-**Status**: Completed (2025-11-15)
+**Status**: Completed (2025-11-15), Simplified (2025-11-17)
 
 ### Tasks
-1. Create `app/api/jobs/[id]/stream/route.ts` - SSE endpoint
+
+1. ~~Create `app/api/jobs/[id]/stream/route.ts` - SSE endpoint~~ → `app/api/jobs/stream/route.ts`
 2. Implement Redis pub/sub for job updates
 3. Stream progress events to clients
 4. Handle connection lifecycle
@@ -81,6 +82,11 @@
 6. Test SSE with EventSource
 
 **Deliverable**: Real-time job updates via SSE
+
+**Architecture Evolution (2025-11-17)**:
+
+- Simplified from global subscriber to per-connection pattern
+- See Architecture Decisions Log entry below for details
 
 **⚠️ STOP: Ask user before proceeding to Phase 5**
 
@@ -230,3 +236,66 @@ All phases completed successfully including Phase 5 (Admin Dashboard).
 - Unit test suite
 - Failure handling with proper status display
 - Redis URL-based configuration
+
+---
+
+### 2025-11-17: SSE Architecture Simplification ✅
+
+**Status**: Complete
+
+**Problem Identified**:
+
+- Initial implementation used `globalSubscriber` (shared Redis subscriber across all SSE connections)
+- Complex initialization with promise chains, nullable patterns, async race conditions
+- Module-level state caused HMR duplication issues (zombie connections in dev)
+- Multi-process concerns (PM2 cluster, K8s) would duplicate subscriber per process
+- 149 lines with significant complexity managing shared state
+
+**Original Global Subscriber Issues**:
+
+1. HMR in dev created multiple subscriber instances on file save
+2. Async initialization pattern with promise memoization
+3. Broadcast-to-all SSE clients requiring Set management
+4. Process exit handlers (SIGTERM/SIGINT) for cleanup
+5. Module-level state doesn't survive Next.js bundle reloads
+
+#### Decision: Simplify to Per-Connection Subscribers
+
+**Rationale**:
+
+- Frontend already uses single SSE connection (`/api/jobs/stream`) solving browser limit (6/domain)
+- Per-connection subscriber eliminates all shared state complexity
+- Automatic cleanup on disconnect (standard Next.js pattern)
+- No HMR issues (subscriber lifecycle tied to request)
+- Works identically in dev/prod/multi-instance deployments
+- Redis easily handles typical connection counts (1-10 SSE clients)
+
+**Implementation**:
+
+- File: `app/api/jobs/stream/route.ts`
+- Pattern: Each SSE connection → `redis.duplicate()` → `psubscribe('job:*:progress')` → cleanup on disconnect
+- 104 lines (30% reduction), no module state, no initialization complexity
+- Cleanup: `await subscriber.punsubscribe()` + `await subscriber.quit()` on abort signal
+
+**Architecture**:
+
+```text
+Frontend (1 EventSource) → /api/jobs/stream → Redis subscriber (pattern match)
+                                                       ↑
+Worker publishes: job:123:progress ────────────────────┘
+```
+
+**Trade-offs**:
+
+- More Redis connections: N SSE clients = N subscribers (vs 1 global)
+- For typical usage (1-10 clients): negligible impact
+- Redis default: 10,000 max connections
+- Benefit: Dramatic simplification, no shared state, automatic cleanup
+
+**Files Changed**:
+
+- Simplified: `app/api/jobs/stream/route.ts` (149 → 104 lines)
+- Deleted: `app/api/jobs/[id]/stream/route.ts` (unused, inconsistent pattern)
+- Updated: README.md (documented architecture benefits)
+
+**Outcome**: Cleaner, simpler, more maintainable code with same functionality
