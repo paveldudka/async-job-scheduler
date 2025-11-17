@@ -1,6 +1,20 @@
 import { NextRequest } from "next/server";
 import { redis } from "@/lib/redis";
 import { getJob } from "@/lib/queue";
+import { jobToApiJob } from "@/lib/utils";
+
+async function sendSSEMessage(
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  message: any
+) {
+  if (!controller.desiredSize) {
+    console.error("Unable to send SSE message. Receiver is disconnected?");
+    return;
+  }
+  // console.log("Sending SSE message:", message);
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+}
 
 // GET /api/jobs/[id]/stream - SSE endpoint for job progress updates
 export async function GET(
@@ -36,43 +50,31 @@ export async function GET(
         }
       };
 
-      // Send initial connection message
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({ type: "connected", jobId: id })}\n\n`
-        )
-      );
-
       // Subscribe to Redis pub/sub for this job's progress
       const subscriber = redis.duplicate();
       await subscriber.connect();
 
       const channelName = `job:${id}:progress`;
 
-      subscriber.on("message", (channel: string, message: string) => {
+      subscriber.on("message", async (channel: string, message: string) => {
         if (channel === channelName) {
           try {
-            const data = JSON.parse(message);
+            console.log("Received progress message:", message);
+            const currentJob = await getJob(id);
 
-            // Handle different event types
-            if (data.type === "failed") {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "failed",
-                    error: data.error,
-                    timestamp: data.timestamp,
-                  })}\n\n`
-                )
-              );
-            } else {
-              // Regular progress update
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: "progress", ...data })}\n\n`
-                )
-              );
+            if (!currentJob) {
+              console.error("Job not found");
+              return;
             }
+
+            const apiJob = await jobToApiJob(currentJob);
+
+            // Send validated message
+            await sendSSEMessage(controller, encoder, {
+              type: "status",
+              job: apiJob,
+              timestamp: new Date().toISOString(),
+            });
           } catch (error) {
             console.error("Error parsing progress message:", error);
           }
@@ -95,45 +97,17 @@ export async function GET(
         try {
           const currentJob = await getJob(id);
           if (!currentJob) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "error",
-                  message: "Job not found",
-                })}\n\n`
-              )
-            );
+            await sendSSEMessage(controller, encoder, {
+              type: "error",
+              message: "Job not found",
+            });
             await cleanupSSEConnection();
             return;
           }
 
-          const state = await currentJob.getState();
+          const apiJob = await jobToApiJob(currentJob);
 
-          // If job is completed or failed, send final status and close
-          if (state === "completed" || state === "failed") {
-            const statusData: {
-              type: string;
-              status: string;
-              progress?: number;
-              error?: string | null;
-              timestamp: string;
-            } = {
-              type: "status",
-              status: state,
-              timestamp: new Date().toISOString(),
-            };
-
-            // Only set progress to 100 for completed jobs
-            if (state === "completed") {
-              statusData.progress = 100;
-            } else if (state === "failed") {
-              statusData.error = currentJob.failedReason || "Unknown error";
-            }
-
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify(statusData)}\n\n`)
-            );
-
+          if (apiJob.status === "completed" || apiJob.status === "failed") {
             await cleanupSSEConnection();
           }
         } catch (error) {

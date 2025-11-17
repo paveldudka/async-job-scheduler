@@ -91,11 +91,11 @@ npm run test:watch    # Watch mode
 
 ## How It Works
 
-1. **Job Created** → Added to Redis queue via BullMQ
-2. **Worker Picks Up** → Processes for 10s with 1s updates
-3. **Progress Published** → Worker → Redis pub/sub
-4. **SSE Streams** → Server subscribes to Redis → Browser
-5. **UI Updates** → React state updates via EventSource
+1. **Job Created** → Added to Redis queue via BullMQ with `jobData` (id, name, createdAt)
+2. **Worker Picks Up** → Processes for 10s with progress updates via `job.updateProgress()`
+3. **Progress Published** → Worker event listeners → Redis pub/sub (`job:${id}:progress`)
+4. **SSE Streams** → Server subscribes to Redis → Sends full `ApiJob` to browser
+5. **UI Updates** → React state updates with complete job state via EventSource
 
 ## Tech Stack
 

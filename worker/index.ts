@@ -20,13 +20,11 @@ interface JobData {
 }
 
 interface JobProgress {
-  status: JobState;
-  jobId: string | undefined;
   action: string | undefined;
-  jobName: string;
   progress: number;
   error: string | undefined;
   timestamp: string;
+  logs: string[] | undefined;
 }
 
 // Mock web agent actions
@@ -51,7 +49,9 @@ function getRandomAction(): string {
 }
 
 // Simulate async work with progress updates
-async function processJob(job: Job<JobData>): Promise<{ logs: string[] }> {
+async function processJob(
+  job: Job<JobData, string[]>
+): Promise<{ logs: string[] }> {
   const logs: string[] = [];
   const totalSteps = 10;
   const stepDuration = 1000; // 1 second per step
@@ -68,9 +68,6 @@ async function processJob(job: Job<JobData>): Promise<{ logs: string[] }> {
 
     // Update job progress
     await job.updateProgress({
-      status: "active",
-      jobId: job.id,
-      jobName: job.data.name,
       progress,
       action,
       timestamp: new Date().toISOString(),
@@ -95,9 +92,9 @@ async function processJob(job: Job<JobData>): Promise<{ logs: string[] }> {
 // Create worker
 const worker = new Worker<JobData>(
   QUEUE_NAME,
-  async (job: Job<JobData>) => {
+  async (job: Job<JobData, string[]>) => {
     // Simulate random failures (15% chance)
-    if (Math.random() < 0.15) {
+    if (Math.random() < 0.0) {
       throw new Error("Simulated random failure");
     }
 
@@ -117,26 +114,19 @@ const worker = new Worker<JobData>(
 worker.on("active", (job) => {
   console.log(`[WORKER] 📊 Job ${job.id} is active`);
   job.updateProgress({
-    status: "active",
-    jobId: job.id,
-    jobName: job.data.name,
     progress: 0,
     action: "Starting job",
     timestamp: new Date().toISOString(),
-  });
+  } as JobProgress);
 });
 
 // Worker event listeners
 worker.on("completed", (job) => {
   console.log(`[WORKER] ✅ Job ${job.id} completed successfully`);
   job.updateProgress({
-    status: "completed",
-    jobId: job.id,
-    jobName: job.data.name,
     progress: 100,
-    action: "Job completed",
     timestamp: new Date().toISOString(),
-  });
+  } as JobProgress);
 });
 
 worker.on("failed", (job, err) => {
@@ -146,11 +136,7 @@ worker.on("failed", (job, err) => {
     return;
   }
   job.updateProgress({
-    status: "failed",
-    jobId: job.id,
-    jobName: job.data.name,
     progress: 100,
-    action: "Job failed",
     timestamp: new Date().toISOString(),
   } as JobProgress);
 });

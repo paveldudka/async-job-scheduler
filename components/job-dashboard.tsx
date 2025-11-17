@@ -3,11 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  Play,
   X,
   RotateCw,
   Trash2,
@@ -20,23 +18,13 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
+import { type ApiJob } from "@/lib/models";
+import { type JobState } from "bullmq";
 
-type JobStatus = "waiting" | "active" | "completed" | "failed" | "delayed";
-
-interface Job {
-  id: string;
-  name: string;
-  status: JobStatus;
-  progress: number | { progress: number; action: string; timestamp: string };
-  createdAt: string;
-  finishedAt: string | null;
-  failedReason: string | null;
-  attemptsMade: number;
-  logs?: string[];
-}
+type JobStatus = JobState | "unknown";
 
 export function JobDashboard() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<ApiJob[]>([]);
   const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all");
   const [loading, setLoading] = useState(false);
   const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
@@ -64,15 +52,13 @@ export function JobDashboard() {
 
     // Open SSE for active jobs
     activeJobs.forEach((job) => {
-      if (!eventSourcesRef.current.has(job.id)) {
-        console.log(`============== Opening SSE for job ${job.id}`);
+      if (job.id && !eventSourcesRef.current.has(job.id)) {
         connectToJobStream(job.id);
       }
     });
 
     return () => {
       // Cleanup all SSE connections on unmount
-      console.log("============== Closing SSE connections");
       eventSourcesRef.current.forEach((es) => es.close());
       eventSourcesRef.current.clear();
     };
@@ -90,43 +76,28 @@ export function JobDashboard() {
     }
   };
 
-  const connectToJobStream = (jobId: string) => {
+  const connectToJobStream = (jobId: string | undefined) => {
+    if (!jobId) return;
+
     const es = new EventSource(`/api/jobs/${jobId}/stream`);
 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
 
-        if (data.type === "progress") {
+        if (data.type === "status" && data.job) {
+          // Update with full ApiJob from SSE
           setJobs((prev) =>
-            prev.map((job) =>
-              job.id === jobId
-                ? {
-                    ...job,
-                    progress: {
-                      progress: data.progress,
-                      action: data.action,
-                      timestamp: data.timestamp,
-                    },
-                  }
-                : job
-            )
+            prev.map((job) => (job.id === jobId ? data.job : job))
           );
-        } else if (data.type === "failed") {
-          // Job failed - update immediately
-          setJobs((prev) =>
-            prev.map((job) =>
-              job.id === jobId
-                ? { ...job, status: "failed", failedReason: data.error }
-                : job
-            )
-          );
-          fetchJobs();
-          es.close();
-          eventSourcesRef.current.delete(jobId);
-        } else if (data.type === "status") {
-          // Job completed or failed - refresh
-          fetchJobs();
+
+          // Close SSE if job completed/failed
+          if (data.job.status === "completed" || data.job.status === "failed") {
+            es.close();
+            eventSourcesRef.current.delete(jobId);
+          }
+        } else if (data.type === "error") {
+          console.error("SSE error:", data.message);
           es.close();
           eventSourcesRef.current.delete(jobId);
         }
@@ -162,7 +133,8 @@ export function JobDashboard() {
     }
   };
 
-  const cancelJob = async (id: string) => {
+  const cancelJob = async (id: string | undefined) => {
+    if (!id) return;
     try {
       await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
       await fetchJobs();
@@ -171,7 +143,8 @@ export function JobDashboard() {
     }
   };
 
-  const retryJob = async (id: string) => {
+  const retryJob = async (id: string | undefined) => {
+    if (!id) return;
     try {
       await fetch(`/api/jobs/${id}/retry`, { method: "POST" });
       await fetchJobs();
@@ -180,7 +153,8 @@ export function JobDashboard() {
     }
   };
 
-  const deleteJob = async (id: string) => {
+  const deleteJob = async (id: string | undefined) => {
+    if (!id) return;
     try {
       await fetch(`/api/jobs/${id}`, { method: "DELETE" });
       await fetchJobs();
@@ -229,16 +203,12 @@ export function JobDashboard() {
       : `${remainingSeconds}s`;
   };
 
-  const getProgress = (job: Job): number => {
-    if (typeof job.progress === "number") return job.progress;
+  const getProgress = (job: ApiJob): number => {
     return job.progress?.progress || 0;
   };
 
-  const getProgressAction = (job: Job): string | null => {
-    if (typeof job.progress === "object" && job.progress.action) {
-      return job.progress.action;
-    }
-    return null;
+  const getProgressAction = (job: ApiJob): string | null => {
+    return job.progress?.action || null;
   };
 
   const activeCount = jobs.filter((j) => j.status === "active").length;

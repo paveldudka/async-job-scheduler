@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getJob, deleteJob } from '@/lib/queue';
+import { NextRequest, NextResponse } from "next/server";
+import { getJob, deleteJob } from "@/lib/queue";
+import { ApiJob, JobProgress } from "@/lib/models";
 
 // GET /api/jobs/[id] - Get job details
 export async function GET(
@@ -11,35 +12,32 @@ export async function GET(
     const job = await getJob(id);
 
     if (!job) {
-      return NextResponse.json(
-        { error: 'Job not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
     const state = await job.getState();
-    const logs = job.returnvalue?.logs || [];
+
+    const apiJob: ApiJob = {
+      id: job.id,
+      name: job.data.name,
+      status: state,
+      createdAt: job.data.createdAt,
+      progress: job.progress as JobProgress,
+      finishedAt: job.finishedOn
+        ? new Date(job.finishedOn).toISOString()
+        : null,
+      failedReason: state === "failed" ? job.failedReason || null : null,
+      attemptsMade: job.attemptsMade,
+      logs: job.returnvalue || [],
+    };
 
     return NextResponse.json({
       success: true,
-      job: {
-        id: job.id,
-        name: job.data.name,
-        status: state,
-        createdAt: job.data.createdAt,
-        progress: job.progress || 0,
-        finishedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
-        failedReason: state === 'failed' ? (job.failedReason || null) : null,
-        attemptsMade: job.attemptsMade,
-        logs,
-      },
+      job: apiJob,
     });
   } catch (error) {
-    console.error('Error fetching job:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch job' },
-      { status: 500 }
-    );
+    console.error("Error fetching job:", error);
+    return NextResponse.json({ error: "Failed to fetch job" }, { status: 500 });
   }
 }
 
@@ -53,20 +51,17 @@ export async function DELETE(
     const deleted = await deleteJob(id);
 
     if (!deleted) {
-      return NextResponse.json(
-        { error: 'Job not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Job deleted successfully',
+      message: "Job deleted successfully",
     });
   } catch (error) {
-    console.error('Error deleting job:', error);
+    console.error("Error deleting job:", error);
     return NextResponse.json(
-      { error: 'Failed to delete job' },
+      { error: "Failed to delete job" },
       { status: 500 }
     );
   }

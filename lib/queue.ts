@@ -1,22 +1,9 @@
-import { Queue, QueueEvents } from "bullmq";
+import { Queue } from "bullmq";
 import { redis } from "./redis";
+import { JobData } from "./models";
 
 // Queue configuration
 const QUEUE_NAME = process.env.QUEUE_NAME || "jobs";
-
-// Job data interface
-export interface JobData {
-  id: string;
-  name: string;
-  createdAt: string;
-}
-
-// Job progress interface
-export interface JobProgress {
-  progress: number;
-  action: string;
-  timestamp: string;
-}
 
 // Create BullMQ queue instance
 export const jobQueue = new Queue<JobData>(QUEUE_NAME, {

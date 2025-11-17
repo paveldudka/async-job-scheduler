@@ -174,43 +174,40 @@
 - **SSE streaming**: Real-time updates confirmed working
 - **Build**: Clean TypeScript compilation, no errors
 
-### 2025-11-16: Worker Refactor - Centralized Progress Publishing
-**Status**: Worker updates complete, jobs endpoint cleanup in progress
+### 2025-11-16: Worker Refactor & Type System Overhaul ✅
+**Status**: Complete
 
-**Changes**:
+**Architecture Changes**:
 - Refactored worker to use BullMQ's `job.updateProgress()` instead of direct Redis pub/sub
-- Added comprehensive `JobProgress` interface with fields:
-  - `status: JobState` - active/completed/failed
-  - `jobId: string` - job identifier
-  - `jobName: string` - job display name
-  - `progress: number` - percentage (0-100)
-  - `action: string` - current action description
-  - `error: string | undefined` - error message if failed
-  - `timestamp: string` - ISO timestamp
 - Centralized Redis pub/sub through worker event listeners:
-  - `worker.on("progress")` - publishes all progress updates (line 160-166)
+  - `worker.on("progress")` - publishes all progress updates (line 165)
   - `worker.on("active")` - publishes initial 0% progress (line 119-129)
   - `worker.on("completed")` - publishes 100% completion (line 132-142)
   - `worker.on("failed")` - publishes failure state (line 144-158)
 - Removed direct `redis.publish()` calls from job processing logic
-- Added Zod validation for type-safe Redis messages:
-  - `progressMessageSchema` - validates progress updates
-  - `failedMessageSchema` - validates failure messages
-  - `jobNotificationSchema` - union type for Redis pub/sub
-  - `sseMessageSchema` - union type for SSE events (connected, progress, failed, status, error)
-- Updated SSE route to validate incoming Redis messages with Zod
-- Installed Zod in worker package (v4.1.12)
+- Single source of truth for progress publishing (worker event listeners)
+
+**Type System**:
+- Created `lib/models.ts` with TypeScript interfaces:
+  - `JobData` - input data when creating jobs (id, name, createdAt)
+  - `JobProgress` - worker progress state (status, jobId, jobName, progress, action, error, timestamp)
+  - `ApiJob` - API response shape (id, name, status, createdAt, progress, finishedAt, failedReason, attemptsMade, logs)
+- Created `lib/utils.ts` helper:
+  - `jobToApiJob()` - converts BullMQ job to ApiJob format
+  - Extracts status from JobProgress when available, falls back to `job.getState()`
+- Refactored all API routes to use `jobToApiJob()`:
+  - `POST /api/jobs` - create job
+  - `GET /api/jobs` - list all jobs
+  - `GET /api/jobs/[id]` - get job details
+  - `GET /api/jobs/[id]/stream` - SSE endpoint
+- SSE route now sends full ApiJob object in status messages
 
 **Benefits**:
-- Single source of truth for progress publishing (worker event listeners)
-- Consistent message structure across all job states
-- Type-safe message validation prevents runtime errors
-- Cleaner separation: worker logic vs. pub/sub infrastructure
-- More structured JobProgress with full context (status, jobId, jobName)
-
-**Next Steps**:
-- Clean up jobs endpoint to align with new message schema
-- Update frontend to consume new JobProgress structure
+- Consistent job representation across all API endpoints
+- Type-safe interfaces prevent runtime errors
+- Cleaner separation: worker logic vs. API serialization
+- SSE clients receive complete job state (not just progress)
+- Single helper function (`jobToApiJob`) for job transformation
 
 ---
 
