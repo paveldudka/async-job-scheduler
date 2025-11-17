@@ -94,7 +94,7 @@ const worker = new Worker<JobData>(
   QUEUE_NAME,
   async (job: Job<JobData, string[]>) => {
     // Simulate random failures (15% chance)
-    if (Math.random() < 0.0) {
+    if (Math.random() < 0.15) {
       throw new Error("Simulated random failure");
     }
 
