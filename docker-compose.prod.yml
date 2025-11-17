@@ -21,8 +21,7 @@ services:
       dockerfile: Dockerfile
     container_name: async-app-web
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     environment:
       - REDIS_URL=redis://redis:6379
       - QUEUE_NAME=jobs
@@ -39,8 +38,7 @@ services:
       dockerfile: Dockerfile
     container_name: async-app-worker
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     environment:
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=production

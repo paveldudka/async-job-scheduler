@@ -17,7 +17,6 @@ export async function jobToApiJob(
 ): Promise<ApiJob> {
   let state: JobState | "unknown";
   state = await job.getState();
-  console.log("Job state:", state);
   return {
     id: job.id,
     name: job.data.name,

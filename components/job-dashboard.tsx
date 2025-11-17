@@ -27,7 +27,7 @@ export function JobDashboard() {
   const [jobs, setJobs] = useState<ApiJob[]>([]);
   const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all");
   const [loading, setLoading] = useState(false);
-  const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Fetch all jobs on mount
   useEffect(() => {
@@ -36,33 +36,47 @@ export function JobDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Setup SSE for active jobs
+  // Setup single SSE connection for all job updates
   useEffect(() => {
-    const activeJobs = jobs.filter(
-      (j) => j.status === "active" || j.status === "waiting"
-    );
+    // Only connect if not already connected
+    if (eventSourceRef.current) {
+      return;
+    }
 
-    // Close SSE for non-active jobs
-    eventSourcesRef.current.forEach((es, jobId) => {
-      if (!activeJobs.find((j) => j.id === jobId)) {
-        es.close();
-        eventSourcesRef.current.delete(jobId);
-      }
-    });
+    console.log("Opening single SSE connection for all jobs");
+    const es = new EventSource("/api/jobs/stream");
 
-    // Open SSE for active jobs
-    activeJobs.forEach((job) => {
-      if (job.id && !eventSourcesRef.current.has(job.id)) {
-        connectToJobStream(job.id);
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "job-update" && data.job) {
+          // Update job in state
+          setJobs((prev) =>
+            prev.map((job) => (job.id === data.job.id ? data.job : job))
+          );
+        }
+      } catch (error) {
+        console.error("Error parsing SSE message:", error);
       }
-    });
+    };
+
+    es.onerror = (error) => {
+      console.error("SSE error:", error);
+      es.close();
+      eventSourceRef.current = null;
+    };
+
+    eventSourceRef.current = es;
 
     return () => {
-      // Cleanup all SSE connections on unmount
-      eventSourcesRef.current.forEach((es) => es.close());
-      eventSourcesRef.current.clear();
+      console.log("Closing SSE connection on unmount");
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
     };
-  }, [jobs]);
+  }, []);
 
   const fetchJobs = async () => {
     try {
@@ -74,44 +88,6 @@ export function JobDashboard() {
     } catch (error) {
       console.error("Error fetching jobs:", error);
     }
-  };
-
-  const connectToJobStream = (jobId: string | undefined) => {
-    if (!jobId) return;
-
-    const es = new EventSource(`/api/jobs/${jobId}/stream`);
-
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "status" && data.job) {
-          // Update with full ApiJob from SSE
-          setJobs((prev) =>
-            prev.map((job) => (job.id === jobId ? data.job : job))
-          );
-
-          // Close SSE if job completed/failed
-          if (data.job.status === "completed" || data.job.status === "failed") {
-            es.close();
-            eventSourcesRef.current.delete(jobId);
-          }
-        } else if (data.type === "error") {
-          console.error("SSE error:", data.message);
-          es.close();
-          eventSourcesRef.current.delete(jobId);
-        }
-      } catch (error) {
-        console.error("Error parsing SSE message:", error);
-      }
-    };
-
-    es.onerror = () => {
-      es.close();
-      eventSourcesRef.current.delete(jobId);
-    };
-
-    eventSourcesRef.current.set(jobId, es);
   };
 
   const createJob = async () => {
