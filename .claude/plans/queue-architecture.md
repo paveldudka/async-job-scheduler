@@ -174,6 +174,44 @@
 - **SSE streaming**: Real-time updates confirmed working
 - **Build**: Clean TypeScript compilation, no errors
 
+### 2025-11-16: Worker Refactor - Centralized Progress Publishing
+**Status**: Worker updates complete, jobs endpoint cleanup in progress
+
+**Changes**:
+- Refactored worker to use BullMQ's `job.updateProgress()` instead of direct Redis pub/sub
+- Added comprehensive `JobProgress` interface with fields:
+  - `status: JobState` - active/completed/failed
+  - `jobId: string` - job identifier
+  - `jobName: string` - job display name
+  - `progress: number` - percentage (0-100)
+  - `action: string` - current action description
+  - `error: string | undefined` - error message if failed
+  - `timestamp: string` - ISO timestamp
+- Centralized Redis pub/sub through worker event listeners:
+  - `worker.on("progress")` - publishes all progress updates (line 160-166)
+  - `worker.on("active")` - publishes initial 0% progress (line 119-129)
+  - `worker.on("completed")` - publishes 100% completion (line 132-142)
+  - `worker.on("failed")` - publishes failure state (line 144-158)
+- Removed direct `redis.publish()` calls from job processing logic
+- Added Zod validation for type-safe Redis messages:
+  - `progressMessageSchema` - validates progress updates
+  - `failedMessageSchema` - validates failure messages
+  - `jobNotificationSchema` - union type for Redis pub/sub
+  - `sseMessageSchema` - union type for SSE events (connected, progress, failed, status, error)
+- Updated SSE route to validate incoming Redis messages with Zod
+- Installed Zod in worker package (v4.1.12)
+
+**Benefits**:
+- Single source of truth for progress publishing (worker event listeners)
+- Consistent message structure across all job states
+- Type-safe message validation prevents runtime errors
+- Cleaner separation: worker logic vs. pub/sub infrastructure
+- More structured JobProgress with full context (status, jobId, jobName)
+
+**Next Steps**:
+- Clean up jobs endpoint to align with new message schema
+- Update frontend to consume new JobProgress structure
+
 ---
 
 ## Project Status: COMPLETE ✅

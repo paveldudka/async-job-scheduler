@@ -1,4 +1,4 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, JobState } from "bullmq";
 import Redis from "ioredis";
 
 // Redis connection
@@ -19,10 +19,13 @@ interface JobData {
   createdAt: string;
 }
 
-// Job progress interface
 interface JobProgress {
+  status: JobState;
+  jobId: string | undefined;
+  action: string | undefined;
+  jobName: string;
   progress: number;
-  action: string;
+  error: string | undefined;
   timestamp: string;
 }
 
@@ -53,7 +56,9 @@ async function processJob(job: Job<JobData>): Promise<{ logs: string[] }> {
   const totalSteps = 10;
   const stepDuration = 1000; // 1 second per step
 
-  console.log(`📝 Processing job ${job.id}: ${job.data.name}`);
+  console.log(
+    `📝 Processing job ${job.id}: ${job.data.name}: ${await job.getState()}`
+  );
   logs.push(`Started processing job: ${job.data.name}`);
 
   for (let step = 1; step <= totalSteps; step++) {
@@ -63,20 +68,13 @@ async function processJob(job: Job<JobData>): Promise<{ logs: string[] }> {
 
     // Update job progress
     await job.updateProgress({
+      status: "active",
+      jobId: job.id,
+      jobName: job.data.name,
       progress,
       action,
       timestamp: new Date().toISOString(),
     } as JobProgress);
-
-    // Publish progress to Redis for SSE
-    await redis.publish(
-      `job:${job.id}:progress`,
-      JSON.stringify({
-        progress,
-        action,
-        timestamp: new Date().toISOString(),
-      })
-    );
 
     const logMessage = `[${step}/${totalSteps}] ${action} (${progress}%)`;
     console.log(`  ${logMessage}`);
@@ -98,29 +96,13 @@ async function processJob(job: Job<JobData>): Promise<{ logs: string[] }> {
 const worker = new Worker<JobData>(
   QUEUE_NAME,
   async (job: Job<JobData>) => {
-    try {
-      // Simulate random failures (15% chance)
-      if (Math.random() < 0.15) {
-        throw new Error("Simulated random failure");
-      }
-
-      const result = await processJob(job);
-      return result;
-    } catch (error) {
-      console.error(`❌ Job ${job.id} failed:`, error);
-
-      // Publish failure event to Redis for SSE
-      await redis.publish(
-        `job:${job.id}:progress`,
-        JSON.stringify({
-          type: "failed",
-          error: error instanceof Error ? error.message : "Unknown error",
-          timestamp: new Date().toISOString(),
-        })
-      );
-
-      throw error;
+    // Simulate random failures (15% chance)
+    if (Math.random() < 0.15) {
+      throw new Error("Simulated random failure");
     }
+
+    const result = await processJob(job);
+    return result;
   },
   {
     connection: redis,
@@ -132,13 +114,45 @@ const worker = new Worker<JobData>(
   }
 );
 
+worker.on("active", (job) => {
+  console.log(`[WORKER] 📊 Job ${job.id} is active`);
+  job.updateProgress({
+    status: "active",
+    jobId: job.id,
+    jobName: job.data.name,
+    progress: 0,
+    action: "Starting job",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Worker event listeners
 worker.on("completed", (job) => {
   console.log(`[WORKER] ✅ Job ${job.id} completed successfully`);
+  job.updateProgress({
+    status: "completed",
+    jobId: job.id,
+    jobName: job.data.name,
+    progress: 100,
+    action: "Job completed",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 worker.on("failed", (job, err) => {
   console.error(`[WORKER] ❌ Job ${job?.id} failed with error:`, err.message);
+  if (!job) {
+    console.error("Job not found");
+    return;
+  }
+  job.updateProgress({
+    status: "failed",
+    jobId: job.id,
+    jobName: job.data.name,
+    progress: 100,
+    action: "Job failed",
+    timestamp: new Date().toISOString(),
+  } as JobProgress);
 });
 
 worker.on("progress", (job, progress) => {
@@ -146,6 +160,7 @@ worker.on("progress", (job, progress) => {
   console.log(
     `[WORKER] 📊 Job ${job.id} progress: ${prog.progress}% - ${prog.action}`
   );
+  redis.publish(`job:${job.id}:progress`, JSON.stringify(prog));
 });
 
 worker.on("error", (err) => {
