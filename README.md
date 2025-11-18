@@ -13,7 +13,18 @@ Browser → Next.js API → Redis Queue → Worker → Redis Pub/Sub → SSE →
 - **Worker**: Background job processor (max 5 concurrent)
 - **SSE**: Real-time progress streaming (single connection pattern)
 
-### Data Flow Sequence
+### Data Flow
+
+- Browser Client creates a job via `POST /api/jobs`
+- Browser Client opens SSE connection to `GET /api/jobs/stream` to monitor job progress
+- Next.js API route adds job id (`abc123`) to Redis queue via BullMQ and returns job ID to the client
+- Next.js API route opens Redis subscriber to `psubscribe('job:*:progress')` to receive job progress updates
+- Worker picks up job from queue and processes it
+- Worker:
+  - updates persistent storage with job progress `job.updateProgress()`
+  - publishes job progress to Redis Pub/Sub (`job:abc123:progress`)
+- Next.js API route receives job progress from Redis Pub/Sub (`job:*:progress`), fetches job details from persistent storage, and publishes job details to SSE connection
+- Browser Client receives job details via SSE connection and updates UI
 
 ![Data Flow Architecture](data_flow.png)
 
@@ -36,11 +47,13 @@ docker compose up --build
 Access at `http://localhost:3000`
 
 **Stop:**
+
 ```bash
 docker compose down
 ```
 
 **Clean restart (wipes Redis data):**
+
 ```bash
 docker compose down -v
 docker compose up --build
@@ -94,6 +107,7 @@ test/                  # Unit tests (Vitest)
 ## Environment
 
 `.env.local`:
+
 ```bash
 REDIS_HOST=localhost
 REDIS_PORT=6379
