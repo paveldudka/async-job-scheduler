@@ -17,8 +17,8 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
-import { Github } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { type ApiJob } from "@/lib/models";
 import { type JobState } from "bullmq";
 
@@ -216,7 +216,13 @@ export function JobDashboard() {
             rel="noopener noreferrer"
           >
             <Button variant="outline" className="gap-2">
-              <Github className="h-4 w-4" />
+              <Image
+                src="/github.svg"
+                alt="GitHub"
+                width={16}
+                height={16}
+                className="h-4 w-4"
+              />
               GitHub
             </Button>
           </Link>
