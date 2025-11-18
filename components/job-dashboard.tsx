@@ -17,6 +17,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
+import { Github } from "lucide-react";
 import Link from "next/link";
 import { type ApiJob } from "@/lib/models";
 import { type JobState } from "bullmq";
@@ -208,12 +209,24 @@ export function JobDashboard() {
             Submit and monitor job execution status in real-time
           </p>
         </div>
-        <Link href="/admin">
-          <Button variant="outline" className="gap-2">
-            <Settings className="h-4 w-4" />
-            Admin
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="https://github.com/paveldudka/async-job-scheduler"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="outline" className="gap-2">
+              <Github className="h-4 w-4" />
+              GitHub
+            </Button>
+          </Link>
+          <Link href="/admin">
+            <Button variant="outline" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Admin
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
