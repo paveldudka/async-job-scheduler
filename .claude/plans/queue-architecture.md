@@ -215,6 +215,41 @@
 - SSE clients receive complete job state (not just progress)
 - Single helper function (`jobToApiJob`) for job transformation
 
+### 2025-11-17: Disabled Automatic Retry ✅
+
+**Status**: Complete
+
+**Change**:
+
+- Disabled automatic retry mechanism in BullMQ
+- Changed `attempts: 3` → `attempts: 1` in queue configuration
+- Removed exponential backoff configuration
+- File: `lib/queue.ts:12`
+
+**Rationale**:
+
+- Explicit retry control via UI/API only
+- Clearer job lifecycle (fail → wait for user action)
+- Prevents automatic retry storms on persistent failures
+- User maintains full control over retry timing
+
+**Implementation**:
+
+```typescript
+defaultJobOptions: {
+  attempts: 1, // No automatic retry - explicit retry only
+  removeOnComplete: false,
+  removeOnFail: false,
+}
+```
+
+**Retry Flow**:
+
+- Job fails → status: "failed"
+- User clicks retry button → `POST /api/jobs/[id]/retry`
+- API calls `job.retry()` → job re-queued
+- Worker picks up and processes again
+
 ---
 
 ## Project Status: COMPLETE ✅

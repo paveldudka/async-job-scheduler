@@ -9,11 +9,7 @@ const QUEUE_NAME = process.env.QUEUE_NAME || "jobs";
 export const jobQueue = new Queue<JobData>(QUEUE_NAME, {
   connection: redis,
   defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 2000,
-    },
+    attempts: 1, // No automatic retry - explicit retry only
     removeOnComplete: false, // Keep completed jobs (manual deletion only)
     removeOnFail: false, // Keep failed jobs (manual deletion only)
   },

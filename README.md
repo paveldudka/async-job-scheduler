@@ -58,17 +58,28 @@ docker compose -f docker-compose.prod.yml up --build
 ✅ Real-time SSE progress updates
 ✅ Concurrent processing (5 jobs max)
 ✅ Mock web agent actions (10s duration)
+✅ Manual retry only (no automatic retries)
+✅ Admin dashboard for queue management
 ✅ Full TypeScript + tests (28 passing)
 
 ## API Endpoints
+
+**Jobs API:**
 
 - `POST /api/jobs` - Create job
 - `GET /api/jobs` - List all jobs
 - `GET /api/jobs/[id]` - Job details
 - `DELETE /api/jobs/[id]` - Delete job
 - `POST /api/jobs/[id]/cancel` - Cancel job
-- `POST /api/jobs/[id]/retry` - Retry failed job
+- `POST /api/jobs/[id]/retry` - Retry failed job (explicit only)
 - `GET /api/jobs/stream` - SSE endpoint (single connection for all jobs)
+
+**Admin API:**
+
+- `GET /api/admin/queues` - Queue metrics
+- `POST /api/admin/queues/clean` - Clean completed/failed jobs
+- `POST /api/admin/queues/pause` - Pause queue
+- `POST /api/admin/queues/resume` - Resume queue
 
 ## Project Structure
 
@@ -107,6 +118,7 @@ npm run test:watch    # Watch mode
 4. **SSE Streams** → Single frontend connection to `/api/jobs/stream` receives all job updates
 5. **Per-Connection Subscriber** → Each SSE connection creates Redis subscriber, cleaned up on disconnect
 6. **UI Updates** → React filters relevant jobs, updates state via EventSource
+7. **Manual Retry** → Failed jobs require explicit retry via button/API (attempts: 1)
 
 **Architecture Benefits:**
 
